@@ -99,7 +99,7 @@ static void lookupWords ()
   bool found;
   std::string linebuf;
     
-  for(;;)
+  for (;;)
   {
     found = false;
 
@@ -133,7 +133,7 @@ int main ()
 
     // Print the word list
     std::cout << std::endl << "=== Word list:" << std::endl;
-    for (auto p : s_wordsMap)
+    for (const auto& p : s_wordsMap)
       std::cout << p.first << " " << p.second << std::endl;
 
     lookupWords();
