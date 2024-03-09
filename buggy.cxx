@@ -3,38 +3,18 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
-#include <vector>
+#include <map>
 
-struct Word
-{
-  std::string data;
-  int count;
-
-  Word (std::string data_ ) :
-    data(data_),
-    count(1)
-  {}
-  
-  Word () :
-    data(std::string()), 
-    count(1)
-  {}
-};
-
-static std::vector<Word> s_wordsArray;
-static Word s_word;
+// Map that maps a word to a count for the number of times it is added to the system.
+// Items are kept in alphabetical order.
+static std::map<std::string, int> s_wordsMap;
+static std::string s_word;
 static int s_totalFound;
 
-// Variables for thread syncronization safety
+// Variables for thread synchronization safety
 static std::mutex s_mutex;
 static std::condition_variable s_condVar;
 static bool s_wordReady = false;
-
-// Custom comparison function to sort words in alphabetically
-//
-static bool compareWords(const Word& a, const Word& b) {
-    return a.data < b.data;
-}
 
 // Worker thread: consume words passed from the main thread and insert them
 // in the 'word list' (s_wordsArray), while removing duplicates. Terminate when
@@ -52,31 +32,19 @@ static void workerThread ()
     // Do we have a new word?
     s_condVar.wait(lock, [] { return s_wordReady; });
 
-    Word w(s_word); // Copy the word
+    std::string w(s_word); // Copy the word
     s_wordReady = false; // Reset the flag to inform the producer that we consumed the word
 
     s_condVar.notify_one(); // Wake up the producer
     lock.unlock(); // Unlock the lock so the producer can start producing while we finish processing
       
-    endEncountered = w.data.compare("end") == 0;
+    endEncountered = w.compare("end") == 0;
       
     if (!endEncountered)
     {
-      // Do not insert duplicate words
-      for (auto &p : s_wordsArray)
-      {
-        if (!p.data.compare(w.data))
-        {
-          ++p.count;
-          found = true;
-          break;
-        }
-      }
-
-      if (!found)
-      {
-        s_wordsArray.push_back(w);
-      }
+        // Do not insert duplicate words.
+        // However still keep track of how many of the same word was added.
+        ++s_wordsMap[w];
     }
   }
 };
@@ -106,7 +74,7 @@ static void readInputWords ()
     std::unique_lock<std::mutex> lock(s_mutex);
     
     // Pass the word to the worker thread
-    s_word.data = linebuf;
+    s_word = linebuf;
     endEncountered = linebuf.compare("end") == 0;
     
     // Tell the worker thread there is a word and to wake up 
@@ -142,13 +110,12 @@ static void lookupWords ()
       break;
     }
 
-    // Search for the word using binary search
-    auto it = std::lower_bound(s_wordsArray.cbegin(), s_wordsArray.cend(), linebuf, compareWords);
-
-    if (it != s_wordsArray.cend())
+    // Search for the word
+    auto it = s_wordsMap.find(linebuf);
+    if (it != s_wordsMap.end())
     {
       std::cout << "SUCCESS: '" 
-        << it->data << "' was present " << it->count << " times in the initial word list"
+        << it->first << "' was present " << it->second << " times in the initial word list"
         << std::endl;
 
       ++s_totalFound;
@@ -163,14 +130,11 @@ int main ()
   try
   {
     readInputWords();
-    
-    // Sort the words alphabetically
-    std::sort(s_wordsArray.begin(), s_wordsArray.end(), compareWords);
 
     // Print the word list
     std::cout << std::endl << "=== Word list:" << std::endl;
-    for (auto p : s_wordsArray)
-      std::cout << p.data << " " << p.count << std::endl;
+    for (auto p : s_wordsMap)
+      std::cout << p.first << " " << p.second << std::endl;
 
     lookupWords();
 
