@@ -1,7 +1,5 @@
 #include <algorithm>
-#include <chrono>
 #include <condition_variable>
-#include <cstdio>
 #include <iostream>
 #include <mutex>
 #include <thread>
@@ -32,6 +30,12 @@ static std::mutex s_mutex;
 static std::condition_variable s_condVar;
 static bool s_wordReady = false;
 
+// Custom comparison function to sort words in alphabetically
+//
+static bool compareWords(const Word& a, const Word& b) {
+    return a.data < b.data;
+}
+
 // Worker thread: consume words passed from the main thread and insert them
 // in the 'word list' (s_wordsArray), while removing duplicates. Terminate when
 // the word 'end' is encountered.
@@ -42,7 +46,7 @@ static void workerThread ()
   
   while (!endEncountered)
   {
-    // Protect the word to read
+    // Protect the word being read
     std::unique_lock<std::mutex> lock(s_mutex);
 
     // Do we have a new word?
@@ -93,7 +97,7 @@ static void readInputWords ()
   {
     if (!std::getline(std::cin, linebuf)) // EOF or error?
     {
-        // If EOF or an error occurs, treat this the same as recieving end to
+        // If EOF or an error occurs, treat this the same as receiving end to
         // handle this gracefully. However, leave EOF in the cin buffer so that
         // the program ends.
         linebuf = "end";
@@ -131,42 +135,29 @@ static void lookupWords ()
   {
     found = false;
 
-    std::printf( "\nEnter a word for lookup:" );
+    std::cout << std::endl << "Enter a word for lookup:";
 
     if (!std::getline(std::cin, linebuf)) // EOF or error?
     {
       break;
     }
 
-    // Initialize the word to search for
-    Word w(linebuf);
+    // Search for the word using binary search
+    auto it = std::lower_bound(s_wordsArray.cbegin(), s_wordsArray.cend(), linebuf, compareWords);
 
-    // Search for the word
-    unsigned i;
-    for ( i = 0; i < s_wordsArray.size(); ++i )
+    if (it != s_wordsArray.cend())
     {
-      if (s_wordsArray[i].data.compare(w.data) == 0)
-      {
-        found = true;
-        break;
-      }
-    }
+      std::cout << "SUCCESS: '" 
+        << it->data << "' was present " << it->count << " times in the initial word list"
+        << std::endl;
 
-    if (found)
-    {
-      std::printf( "SUCCESS: '%s' was present %d times in the initial word list\n",
-                   s_wordsArray[i].data.c_str(), s_wordsArray[i].count);
       ++s_totalFound;
     }
     else
-      std::printf( "'%s' was NOT found in the initial word list\n", w.data.c_str());
+      std::cout << "'" << linebuf << "' was NOT found in the initial word list" << std::endl;
   }
 }
 
-// Custom comparison function to put words in alphabetical order
-bool compareWords(const Word& a, const Word& b) {
-    return a.data < b.data;
-}
 int main ()
 {
   try
@@ -177,17 +168,17 @@ int main ()
     std::sort(s_wordsArray.begin(), s_wordsArray.end(), compareWords);
 
     // Print the word list
-    std::printf( "\n=== Word list:\n" );
+    std::cout << std::endl << "=== Word list:" << std::endl;
     for (auto p : s_wordsArray)
-      std::printf( "%s %d\n", p.data.c_str(), p.count);
+      std::cout << p.data << " " << p.count << std::endl;
 
     lookupWords();
 
-    printf( "\n=== Total words found: %d\n", s_totalFound );
+    std::cout << std::endl << "=== Total words found: " << s_totalFound << std::endl;
   }
   catch (std::exception & e)
   {
-    std::printf( "error %s\n", e.what() );
+    std::cout << "error " << e.what() << std::endl;
   }
   
   return 0;
