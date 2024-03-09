@@ -15,5 +15,5 @@ project ("WovenSoftwarePlatformTest")
 add_executable (SoftwarePlatformTest "buggy.cxx" )
 
 if (CMAKE_VERSION VERSION_GREATER 3.12)
-  set_property(TARGET SoftwarePlatformTest PROPERTY CXX_STANDARD 20)
+  set_property(TARGET SoftwarePlatformTest PROPERTY CXX_STANDARD 26)
 endif()
