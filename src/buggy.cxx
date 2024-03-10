@@ -4,11 +4,14 @@
 #include <mutex>
 #include <thread>
 #include <map>
+#include <regex>
+
+using Word = std::string;
 
 // Map that maps a word to a count for the number of times it is added to the system.
 // Items are kept in alphabetical order.
-static std::map<std::string, int> s_wordsMap;
-static std::string s_word;
+static std::map<Word, int> s_wordsMap;
+static Word s_word;
 static int s_totalFound;
 
 // Variables for thread synchronization safety
@@ -32,19 +35,19 @@ static void workerThread ()
     // Do we have a new word?
     s_condVar.wait(lock, [] { return s_wordReady; });
 
-    std::string w(s_word); // Copy the word
     s_wordReady = false; // Reset the flag to inform the producer that we consumed the word
 
     s_condVar.notify_one(); // Wake up the producer
     lock.unlock(); // Unlock the lock so the producer can start producing while we finish processing
       
-    endEncountered = w.compare("end") == 0;
+    endEncountered = s_word.compare("end") == 0;
       
     if (!endEncountered)
     {
         // Do not insert duplicate words.
         // However still keep track of how many of the same word was added.
-        ++s_wordsMap[w];
+        ++s_wordsMap[s_word];
+        s_word.clear();
     }
   }
 };
@@ -55,6 +58,8 @@ static void workerThread ()
 //
 static void readInputWords ()
 {
+  std::regex validLineRegex("^[!-~]+$"); // Regular expression to match only lines with viable characters and no spaces
+
   bool endEncountered = false;
   
   std::thread worker( workerThread );
@@ -71,20 +76,27 @@ static void readInputWords ()
         linebuf = "end";
     }
 
-    std::unique_lock<std::mutex> lock(s_mutex);
-    
-    // Pass the word to the worker thread
-    s_word = linebuf;
-    endEncountered = linebuf.compare("end") == 0;
-    
-    // Tell the worker thread there is a word and to wake up 
-    s_wordReady = true;
-    s_condVar.notify_one();
-
-    // Wait for the worker thread to consume the word
-    if (!endEncountered)
+    if (!linebuf.empty() && std::regex_match(linebuf, validLineRegex)) // Check if the line is valid
     {
+      std::unique_lock<std::mutex> lock(s_mutex);
+    
+      // Pass the word to the worker thread
+      s_word = linebuf;
+      endEncountered = linebuf.compare("end") == 0;
+    
+      // Tell the worker thread there is a word and to wake up 
+      s_wordReady = true;
+      s_condVar.notify_one();
+
+      // Wait for the worker thread to consume the word
+      if (!endEncountered)
+      {
         s_condVar.wait(lock, [] { return !s_wordReady; });
+      }
+    }
+    else
+    {
+      std::cout << "Invalid line received. Ignoring." << std::endl;
     }
   }
 
@@ -125,6 +137,8 @@ static void lookupWords ()
   }
 }
 
+// Only declare main if we aren't unit testing
+#ifndef UNIT_TEST
 int main ()
 {
   try
@@ -147,3 +161,4 @@ int main ()
   
   return 0;
 }
+#endif
