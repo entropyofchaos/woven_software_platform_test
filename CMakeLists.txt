@@ -21,10 +21,12 @@ project ("WovenSoftwarePlatformTest")
 
 # Add source to this project's executable.
 add_executable (SoftwarePlatformTest "src/buggy.cxx")
-add_executable (UnitTests "tests/test.cpp")
-add_executable (UnitTestsTSan "tests/test.cpp")
-add_executable (UnitTestsASan "tests/test.cpp")
 
+# Add unit tests
+add_executable (UnitTests "tests/test.cpp")
+add_test(NAME RunAllTests COMMAND UnitTests)
+
+# Below versions of UnitTests are created based on if TSans and ASans are available
 
 # Set -Werror to catch "argument unused during compilation" warnings
 include(CheckCXXCompilerFlag)
@@ -37,8 +39,10 @@ unset(CMAKE_REQUIRED_FLAGS)
 # Check if the compiler supports thread sanitizer and if it does, 
 # add it to the respective unit test executables
 if(COMPILER_SUPPORTS_TSAN)
+    add_executable (UnitTestsTSan "tests/test.cpp")
     target_compile_options(UnitTestsTSan PRIVATE -fsanitize=thread -fPIE -pie)
     target_link_options(UnitTestsTSan PRIVATE -fsanitize=thread)
+    add_test(NAME RunAllTestsTSan COMMAND UnitTestsTSan)
 else()
     message(STATUS "Thread Sanitizer is not supported by the compiler.")
 endif()
@@ -46,8 +50,10 @@ endif()
 # Check if the compiler supports taddress sanitizer and if it does, 
 # add it to the respective unit test executables
 if(COMPILER_SUPPORTS_ASAN)
+    add_executable (UnitTestsASan "tests/test.cpp")
     target_compile_options(UnitTestsASan PRIVATE -fsanitize=address -fno-omit-frame-pointer)
     target_link_options(UnitTestsASan PRIVATE -fsanitize=address)
+    add_test(NAME RunAllTestsASan COMMAND UnitTestsASan)
 else()
     message(STATUS "Address Sanitizer is not supported by the compiler.")
 endif()
@@ -59,7 +65,3 @@ add_custom_target(run
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-# Add unit tests
-add_test(NAME RunAllTests COMMAND UnitTests)
-add_test(NAME RunAllTestsTSan COMMAND UnitTestsTSan)
-add_test(NAME RunAllTestsASan COMMAND UnitTestsASan)
