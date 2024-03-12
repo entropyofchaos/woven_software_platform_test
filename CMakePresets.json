@@ -98,8 +98,7 @@
             "description": "Default test configuration",
             "configurePreset": "x86_64-gcc-release",
             "output": {
-                "outputOnFailure": true, 
-                "verbosity": "verbose"
+                "outputOnFailure": true
             },
             "execution": {
                 "noTestsAction": "error",
