@@ -1,0 +1,241 @@
+diff --git a/buggy.cxx b/src/buggy.cxx
+index a2b9aeb..8a8c0bd 100644
+--- a/buggy.cxx
++++ b/src/buggy.cxx
+@@ -1,27 +1,23 @@
+-#include <thread>
+-#include <vector>
+ #include <algorithm>
+-#include <cstdio>
+-#include <cstring>
++#include <condition_variable>
++#include <iostream>
++#include <mutex>
++#include <thread>
++#include <map>
++#include <regex>
+ 
+-struct Word
+-{
+-  char * data;
+-  int count;
++using Word = std::string;
+ 
+-  Word ( char * data_ ) :
+-    data( ::strdup(data_) )
+-  {}
+-  
+-  Word () :
+-    data((char *)"")
+-  {}
+-};
+-
+-static std::vector<Word*> s_wordsArray;
++// Map that maps a word to a count for the number of times it is added to the system.
++// Items are kept in alphabetical order.
++static std::map<Word, int> s_wordsMap;
+ static Word s_word;
+ static int s_totalFound;
+ 
++// Variables for thread synchronization safety
++static std::mutex s_mutex;
++static std::condition_variable s_condVar;
++static bool s_wordReady = false;
+ 
+ // Worker thread: consume words passed from the main thread and insert them
+ // in the 'word list' (s_wordsArray), while removing duplicates. Terminate when
+@@ -33,30 +29,25 @@ static void workerThread ()
+   
+   while (!endEncountered)
+   {
+-    if (s_word.data[0]) // Do we have a new word?
+-    {
+-      Word * w = new Word(s_word); // Copy the word
+-      
+-      s_word.data[0] = 0; // Inform the producer that we consumed the word
++    // Protect the word being read
++    std::unique_lock<std::mutex> lock(s_mutex);
++
++    // Do we have a new word?
++    s_condVar.wait(lock, [] { return s_wordReady; });
++
++    s_wordReady = false; // Reset the flag to inform the producer that we consumed the word
++
++    s_condVar.notify_one(); // Wake up the producer
++    lock.unlock(); // Unlock the lock so the producer can start producing while we finish processing
+       
+-      endEncountered = std::strcmp( s_word.data, "end" ) == 0;
++    endEncountered = s_word.compare("end") == 0;
+       
+-      if (!endEncountered)
+-      {
+-        // Do not insert duplicate words
+-        for ( auto p : s_wordsArray )
+-        {
+-          if (!std::strcmp( p->data, w->data ))
+-          {
+-            ++p->count;
+-            found = true;
+-            break;
+-          }
+-        }
+-
+-        if (!found)
+-          s_wordsArray.push_back( w );
+-      }
++    if (!endEncountered)
++    {
++        // Do not insert duplicate words.
++        // However still keep track of how many of the same word was added.
++        ++s_wordsMap[s_word];
++        s_word.clear();
+     }
+   }
+ };
+@@ -67,25 +58,49 @@ static void workerThread ()
+ //
+ static void readInputWords ()
+ {
++  std::regex validLineRegex("^[!-~]+$"); // Regular expression to match only lines with viable characters and no spaces
++
+   bool endEncountered = false;
+   
+-  std::thread * worker = new std::thread( workerThread );
++  std::thread worker( workerThread );
+ 
+-  char * linebuf = new char[32];
++  std::string linebuf;
+   
+   while (!endEncountered)
+   {
+-    if (!std::gets( linebuf )) // EOF?
+-      return;
++    if (!std::getline(std::cin, linebuf)) // EOF or error?
++    {
++        // If EOF or an error occurs, treat this the same as receiving end to
++        // handle this gracefully. However, leave EOF in the cin buffer so that
++        // the program ends.
++        linebuf = "end";
++    }
++
++    if (!linebuf.empty() && std::regex_match(linebuf, validLineRegex)) // Check if the line is valid
++    {
++      std::unique_lock<std::mutex> lock(s_mutex);
++    
++      // Pass the word to the worker thread
++      s_word = linebuf;
++      endEncountered = linebuf.compare("end") == 0;
+     
+-    endEncountered = std::strcmp( linebuf, "end" ) == 0;
++      // Tell the worker thread there is a word and to wake up 
++      s_wordReady = true;
++      s_condVar.notify_one();
+ 
+-    // Pass the word to the worker thread
+-    std::strcpy( s_word.data, linebuf );
+-    while (s_word.data[0]); // Wait for the worker thread to consume it
++      // Wait for the worker thread to consume the word
++      if (!endEncountered)
++      {
++        s_condVar.wait(lock, [] { return !s_wordReady; });
++      }
++    }
++    else
++    {
++      std::cout << "Invalid line received. Ignoring." << std::endl;
++    }
+   }
+ 
+-  worker->join(); // Wait for the worker to terminate
++  worker.join(); // Wait for the worker to terminate
+ }
+ 
+ // Repeatedly ask the user for a word and check whether it was present in the word list
+@@ -94,62 +109,56 @@ static void readInputWords ()
+ static void lookupWords ()
+ {
+   bool found;
+-  char * linebuf = new char[32];
++  std::string linebuf;
+     
+-  for(;;)
++  for (;;)
+   {
+-    std::printf( "\nEnter a word for lookup:" );
+-    if (std::scanf( "%s", linebuf ) == EOF)
+-      return;
++    found = false;
+ 
+-    // Initialize the word to search for
+-    Word * w = new Word();
+-    std::strcpy( w->data, linebuf );
++    std::cout << std::endl << "Enter a word for lookup:";
+ 
+-    // Search for the word
+-    unsigned i;
+-    for ( i = 0; i < s_wordsArray.size(); ++i )
++    if (!std::getline(std::cin, linebuf)) // EOF or error?
+     {
+-      if (std::strcmp( s_wordsArray[i]->data, w->data ) == 0)
+-      {
+-        found = true;
+-        break;
+-      }
++      break;
+     }
+ 
+-    if (found)
++    // Search for the word
++    auto it = s_wordsMap.find(linebuf);
++    if (it != s_wordsMap.end())
+     {
+-      std::printf( "SUCCESS: '%s' was present %d times in the initial word list\n",
+-                   s_wordsArray[i]->data, s_wordsArray[i]->count );
++      std::cout << "SUCCESS: '" 
++        << it->first << "' was present " << it->second << " times in the initial word list"
++        << std::endl;
++
+       ++s_totalFound;
+     }
+     else
+-      std::printf( "'%s' was NOT found in the initial word list\n", w->data );
++      std::cout << "'" << linebuf << "' was NOT found in the initial word list" << std::endl;
+   }
+ }
+ 
++// Only declare main if we aren't unit testing
++#ifndef UNIT_TEST
+ int main ()
+ {
+   try
+   {
+     readInputWords();
+-    
+-    // Sort the words alphabetically
+-    std::sort( s_wordsArray.begin(), s_wordsArray.end() );
+ 
+     // Print the word list
+-    std::printf( "\n=== Word list:\n" );
+-    for ( auto p : s_wordsArray )
+-      std::printf( "%s %d\n", p->data, p->count );
++    std::cout << std::endl << "=== Word list:" << std::endl;
++    for (const auto& p : s_wordsMap)
++      std::cout << p.first << " " << p.second << std::endl;
+ 
+     lookupWords();
+ 
+-    printf( "\n=== Total words found: %d\n", s_totalFound );
++    std::cout << std::endl << "=== Total words found: " << s_totalFound << std::endl;
+   }
+   catch (std::exception & e)
+   {
+-    std::printf( "error %s\n", e.what() );
++    std::cout << "error " << e.what() << std::endl;
+   }
+   
+   return 0;
+-}
+\ No newline at end of file
++}
++#endif
+\ No newline at end of file
