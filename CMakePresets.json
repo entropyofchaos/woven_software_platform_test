@@ -91,5 +91,20 @@
             "name": "x86_64-gcc-release",
             "configurePreset": "x86_64-gcc-release"
         }
+    ],
+    "testPresets": [
+        {
+            "name": "x86_64-gcc-release",
+            "description": "Default test configuration",
+            "configurePreset": "x86_64-gcc-release",
+            "output": {
+                "outputOnFailure": true, 
+                "verbosity": "verbose"
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": true
+            }
+        }
     ]
 }
