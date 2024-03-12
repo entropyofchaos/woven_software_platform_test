@@ -110,7 +110,7 @@ TEST_CASE("Random and non-visible characters are handled correctly", "[readInput
     s_wordsMap.clear();
 
     // Create a string with a mix of visible, non-visible, and random characters
-    std::string input = "hello\nworld\n\hello world\nx01\x02\x03\nrandom\x7F\xFF\n\033[1mworld\033[0m\n!@#$%^&*\n\nend\n";
+    std::string input = "hello\nworld\nhello world\nx01\x02\x03\nrandom\x7F\xFF\n\033[1mworld\033[0m\n!@#$%^&*\n\nend\n";
 
     setupCin(input);
 
