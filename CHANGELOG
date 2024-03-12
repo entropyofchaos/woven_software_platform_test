@@ -1,0 +1,62 @@
+### General File Structure Added:
+- `src` - Holds the source file `buggy.cxx`.
+- `test` - Holds the unit test source file `test.cpp` and the Catch2 unit test framework header file `catch.hpp`.
+- `$top_level_directory` - Holds scripts to build, run, and test the application.
+- `out\build\$build_type` - A generated directory that will hold the compiled executables.
+
+### buggy.cxx Changes:
+1. **Header Files:**
+   - Removed: `<vector>`, `<cstdio>`, `<cstring>`
+   - Added: `<condition_variable>`, `<iostream>`, `<mutex>`, `<map>`, `<regex>`
+
+2. **Data Structures:**
+   - Replaced the `Word` struct with a simple `using` alias: `using Word = std::string;` as the struct wasn't really necessary once Word was changed to a std::string. This also just simplifies maintenance to use built-in types.
+   - Replaced `std::vector<Word*>` with `std::map<Word, int>` to keep track of words and their counts in alphabetical order using a more efficient data structure.
+
+3. **Thread Synchronization:**
+   - Added variables for thread synchronization safety: `std::mutex s_mutex`, `std::condition_variable s_condVar`, and `bool s_wordReady`. Previously there was not thread safety.
+
+4. **Worker Thread Function (`workerThread`):**
+   - Changed to use mutex and condition variable for synchronization.
+   - Updated logic to use `std::map` for storing words and their counts.
+
+5. **Reading Input Words (`readInputWords`):**
+   - Added regular expression validation for input lines: `std::regex validLineRegex("^[!-~]+$");`
+   - Changed to use `std::getline` for input reading and added checks for valid lines. This also moves away from using unsafe functions that could cause buffer overflows.
+   - Updated synchronization to use the condition variable.
+
+6. **Lookup Words Function (`lookupWords`):**
+   - Changed to use `std::map` for word lookup.
+   - Replaced C-style input and output with C++ style (`std::cin` and `std::cout`).
+
+7. **Main Function:**
+   - Removed sorting of words (no longer needed as `std::map` keeps them sorted).
+      - Also, I did notice that the sort function was implemented incorrectly but it didn't need to be fixed since I changed how the data was stored anyways.
+   - Updated printing of the word list to iterate over `std::map`.
+   - Conditional macro added to allow for unit testing.
+
+### General Improvements:
+- Removed deprecated C function calls.
+- Simplified data structure usage.
+- Removed use of pointers since they were not necessary for the logic and this also removed the pre-existing memory leaks. 
+- Improved thread synchronization using mutex and condition variable. The code initially was not thread safe. This design allows for processing on demand in a safe manner without spinning.
+- Improved input/output handling to handle unknown string unknown I/O sizes to not be dependent on a predefined buffer size. 
+- Added input validation using regular expressions. This was done to handle unexpected characters and to make sure only one single word was submitted at a time.
+- Code is now more idiomatic C++ with better use of standard library features.
+
+### References:
+- See buggy.cxx.diff for a diff of the changes made from the original source.
+
+### Unit Testing:
+- Unit testing framework Catch2 added to unit test the `readInputWords` and `lookupWords` functions.
+   - Implemented in file `tests\test.cpp` 
+- Added a variety of tests to test valid input such as alphanumeric characters and special characters.
+- Added tests to test that non-visible characters and multiple words were not allowed
+- Tests work by stimulating input from standard input and checking that the map is correctly updated as well as checking that outputted text to the console is as expected.
+- Tests are automatically able to be run with CTest as part of the CMake framework
+- The tests are also compiled with ASan and TSan in order to confirm that the code does not have any memory leaks or threading issues.
+
+### Building and Running
+- CMake was utilized as the build system in order to build in a cross platform environment. This has been tested in Windows and Mint Linux.
+- Scripts `build.sh`, `run.sh`, and `runTests.sh` were added to make it easier for the user to run application and its unit tests.
+- `CMakeLists.txt` and `CMakePresets.json` added to configure CMake to allow for easier cross platform compilation and testing.

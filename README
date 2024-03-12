@@ -1,0 +1,25 @@
+### Prerequisites:  
+- cmake 3.8 or greater
+- gcc 11 or greater
+- Linux (Tested with Linux Mint 21.2)
+
+### Setup:
+1. Extract the archive to a directory
+2. Open a terminal at the top level directory
+
+### Building the Application
+1. Run `./build.sh` from the top level directory
+    - You may need to run `chmod +x build.sh` to make the script executable
+
+### Running the Application
+1. Run `./run.sh` from the top level directory
+    - You may need to run `chmod +x build.sh` to make the script executable.
+2. A cursor will start blinking to allow you to start entering words into the database as described in the assignment.
+3. Continue using the application as described by the assignment.
+    - As a note, you can send the `EOF` character to the terminal using `CTRL + d` on the keyboard in order to cleanly exit the application.
+
+### Testing the Application
+1. Run `./runTests.sh` to run the unit tests
+    - You may need to run `chmod +x build.sh` to make the script executable
+    - This will run the unit tests first without TSans and ASans, then it will run the unit tests with TSans, then last it will run the tests with ASans.
+    - If you want to see more verbose output from CTest you can run `./runTests.sh --verbose` from the top level directory. This will show you the output of each version of the test executable.
