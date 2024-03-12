@@ -9,10 +9,20 @@ if (POLICY CMP0141)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT "$<IF:$<AND:$<C_COMPILER_ID:MSVC>,$<CXX_COMPILER_ID:MSVC>>,$<$<CONFIG:Debug,RelWithDebInfo>:EditAndContinue>,$<$<CONFIG:Debug,RelWithDebInfo>:ProgramDatabase>>")
 endif()
 
+# Set C++17 as the standard for all targets
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
 project ("WovenSoftwarePlatformTest")
 
 # Add source to this project's executable.
 add_executable (SoftwarePlatformTest "src/buggy.cxx")
 add_executable (UnitTests "tests/test.cpp")
 
-set_property(TARGET SoftwarePlatformTest PROPERTY CXX_STANDARD 17)
+# Add a custom target that depends on your executable
+add_custom_target(run
+    COMMAND ${CMAKE_CURRENT_BINARY_DIR}/SoftwarePlatformTest
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/SoftwarePlatformTest
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+)

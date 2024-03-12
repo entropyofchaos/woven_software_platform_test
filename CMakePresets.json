@@ -81,5 +81,15 @@
                 "CMAKE_BUILD_TYPE": "Release"
             }
         }
+    ],
+    "buildPresets": [
+        {
+            "name": "x86_64-gcc-debug",
+            "configurePreset": "x86_64-gcc-debug"
+        },
+        {
+            "name": "x86_64-gcc-release",
+            "configurePreset": "x86_64-gcc-release"
+        }
     ]
 }
